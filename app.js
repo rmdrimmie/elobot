@@ -22,47 +22,44 @@ controller.spawn({
 });
 
 var setElo = function( slackId, elo ) {
+  console.log( '[setElo] start for slackid:[' + slackId + '] elo:[' + elo + ']' );
+
   var deferred = Q.defer();
 
-  console.log( '= SETTING ELO. slack id [' + slackId + '] elo [' + elo + ']' );
-
   controller.storage.users.save( { id: slackId, elo: 1000 }, function( err ) {
+    console.log( '[setElo] user saved. resolving with promise to get elo' );
     deferred.resolve( getElo( slackId ) );
   });
 }
 
 var getElo = function( slackId ) {
-  // getuser
-  // then return elo
-  // if user does not exist then create a new one with empty elo
-  console.log( 'start getElo for id ' + slackId );
+  console.log( '[getElo] START for id ' + slackId );
   var deferred = Q.defer();
-
-
 
   var slackUser = controller.storage.users.get( slackId, function( err, elo ) {
 
     if( err && !elo ) {
+      console.log( '[getElo] elo not found. creating new user ' );
       deferred.resolve( setElo( slackId, 1000 ) );
     }
 
+    console.log( '[getElo] found elo. resolving promise with ' + elo );
     deferred.resolve( elo );
   } );
 }
 
 var getPlayers = function( players ) {
-  var deferred = Q.defer();
+  //var deferred = Q.defer();
 
-  console.log( 'start fetching players' );
+  console.log( '[getPlayers] start. getting ' + players.length + ' players.' );
 
-  try {
-    results = _.map( players, getElo )
-  } catch( e ) {
-    console.log( e );
-  }
-  console.log( results );
+  return Q.all( _.map( players, getElo ), function( loadedPlayers ) {
+    console.log( '[getPlayers] resolving with contents output on next line, which is array of found players' );
+    console.log( loadedPlayers );
+    return loadedPlayers;
+  });
 
-  deferred.resolve( results );
+  //deferred.resolve();
 }
 
 var score = function ( options, cb ) {
@@ -98,6 +95,32 @@ var loserElo = this.getElo( loser);
   */
 }
 
+var reportResults = function() {
+  bot.startConversation( message, function( err, conversation) {
+    var deferred = Q.defer();
+
+    //bot.say( 'calculating elo for ' + winner + ' beats ' + loser );
+
+
+    deferred.resolve();
+    // results = score( scoreOptions, function( results ) {
+    //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
+    // });
+  });
+
+
+}
+
+var outputPromise = function( parameter ) {
+  console.log( '[outputPromise] this is:' );
+  console.log( this );
+
+  console.log( '[outputPromise] typeof this:' + typeof( this ));
+
+  console.log( '[outputPromise] received following as parameter' );
+  console.log( promise );
+}
+
 controller.hears( ['beat'],'direct_mention', function( bot, message ) {
   var parsed = message.text.split(' '),
     winner = parsed[0],
@@ -110,24 +133,12 @@ controller.hears( ['beat'],'direct_mention', function( bot, message ) {
     loser:loser.substr( 2, loser.length - 3)
   };
 
-  bot.startConversation( message, function( err, conversation) {
-    var deferred = Q.defer();
-
-    bot.say( 'calculating elo for ' + winner + ' beats ' + loser );
-
-    getPlayers( [winner, loser] );
-      // .then( calculateElo )
-      // .then( getActualRatings )
-      // .then( reportResults )
-      // .then( storePlayers );
-
-    deferred.resolve();
-    // results = score( scoreOptions, function( results ) {
-    //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
-    // });
-  });
-
-
+  getPlayers( [winner, loser] )
+    // .then( calculateElo )
+    // .then( getActualRatings )
+    // .then( reportResults )
+    // .then( storePlayers );)
+    .then( outputPromise );
 });
 
 /*
