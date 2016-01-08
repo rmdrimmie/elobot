@@ -21,29 +21,58 @@ controller.spawn({
   }
 });
 
-var xBeatY = {};
+var setElo = function( slackId, elo ) {
+  var deferred = Q.defer();
 
-xBeatY.getElo = function( slackId ) {
-  var slackUser = controller.storage.users.get( slackId, function( err, user ) {
+  console.log( '= SETTING ELO. slack id [' + slackId + '] elo [' + elo + ']' );
 
-    if( err && !user ) {
-      this.setElo( slackId, 1000 );
-    }
-  } );
-}
-
-xBeatY.setElo = function( slackId, elo ) {
   controller.storage.users.save( { id: slackId, elo: 1000 }, function( err ) {
-    this.getElo( slackId );
+    deferred.resolve( getElo( slackId ) );
   });
 }
 
-xBeatY.score = function ( options, cb ) {
+var getElo = function( slackId ) {
+  // getuser
+  // then return elo
+  // if user does not exist then create a new one with empty elo
+  console.log( 'start getElo for id ' + slackId );
+  var deferred = Q.defer();
+
+
+
+  var slackUser = controller.storage.users.get( slackId, function( err, elo ) {
+
+    if( err && !elo ) {
+      deferred.resolve( setElo( slackId, 1000 ) );
+    }
+
+    deferred.resolve( elo );
+  } );
+}
+
+var getPlayers = function( players ) {
+  var deferred = Q.defer();
+
+  console.log( 'start fetching players' );
+
+  try {
+    results = _.map( players, getElo )
+  } catch( e ) {
+    console.log( e );
+  }
+  console.log( results );
+
+  deferred.resolve( results );
+}
+
+var score = function ( options, cb ) {
   var winner = options.winner;
   var loser = options.loser;
 
-  var winnerElo = this.getElo( winner );
-  var loserElo = this.getElo( loser);
+
+/*
+var winnerElo = this.getElo( winner );
+var loserElo = this.getElo( loser);
 
   expectedWinner = elo.getExpected( winnerElo, loserElo );
   expectedLoser = elo.getExpected( loserElo, winnerElo );
@@ -66,22 +95,39 @@ xBeatY.score = function ( options, cb ) {
   }
 
   cb( results );
+  */
 }
 
 controller.hears( ['beat'],'direct_mention', function( bot, message ) {
   var parsed = message.text.split(' '),
     winner = parsed[0],
     loser = parsed[2],
-    game = parsed[4];
+    game = parsed[4],
+    bot = bot;
 
   var scoreOptions = {
     winner:winner.substr( 2, winner.length - 3),
     loser:loser.substr( 2, loser.length - 3)
   };
 
-  results = xBeatY.score( scoreOptions, function( results ) {
-    bot.reply( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
+  bot.startConversation( message, function( err, conversation) {
+    var deferred = Q.defer();
+
+    bot.say( 'calculating elo for ' + winner + ' beats ' + loser );
+
+    getPlayers( [winner, loser] );
+      // .then( calculateElo )
+      // .then( getActualRatings )
+      // .then( reportResults )
+      // .then( storePlayers );
+
+    deferred.resolve();
+    // results = score( scoreOptions, function( results ) {
+    //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
+    // });
   });
+
+
 });
 
 /*
