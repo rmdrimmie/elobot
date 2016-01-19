@@ -70,7 +70,7 @@ var getPlayers = function( conch ) {
     }
   );
 
-  deferred.resolve( loadedPlayers );
+//  deferred.resolve( loadedPlayers );
 
   return deferred.promise;
 }
@@ -112,12 +112,13 @@ var reportResults = function( conch ) {
   console.log( '[reportResults] trying to talk' );
   console.log( conch ); 
 
-  var winner = conch.players[0];
-  var loser = conch.players[1];
+  var winner = conch[0].id;
+  var loser = conch[1].id;
 
   try { 
-  bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
+    bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
   } catch ( E ) {
+    console.log( 'error' );
     console.log( E );
   }
   console.log( 'a') ;
@@ -176,10 +177,10 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
 */
   getPlayers( conch ) 
     .then( reportResults )
-    .then( outputPromise );
+//    .then( outputPromise );
 //
 
-  console.log( getPlayers( conch ) );
+///  console.log( getPlayers( conch ) );
 });
 
 /*
