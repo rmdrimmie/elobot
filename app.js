@@ -1,9 +1,11 @@
+"use strict";
+
 var _ = require('lodash');
 var Botkit = require('Botkit');
 var elo = require('elo-rank')();
 var Q = require('q');
 
-var bot;
+var bot, message;
 
 if (!process.env.token) {
   console.error( 'Error: Specify token in environment' );
@@ -46,22 +48,31 @@ var getElo = function( slackId ) {
     }
 
     console.log( '[getElo] found elo. resolving promise with ' + elo );
+    console.log( elo );
     deferred.resolve( elo );
   } );
+
+  return deferred;
 }
 
-var getPlayers = function( players ) {
-  //var deferred = Q.defer();
-
+var getPlayers = function( conch ) {
+  var deferred = Q.defer();
+  var players = conch.players;
+  
   console.log( '[getPlayers] start. getting ' + players.length + ' players.' );
 
-  return Q.all( _.map( players, getElo ), function( loadedPlayers ) {
-    console.log( '[getPlayers] resolving with contents output on next line, which is array of found players' );
-    console.log( loadedPlayers );
-    return loadedPlayers;
-  });
+  var loadedPlayers =  Q.all([ 
+    getElo( conch.players[0] ),
+    getElo( conch.players[1] )
+  ]).then( 
+    function( loadedPlayers ) {
+      deferred.resolve( loadedPlayers );
+    }
+  );
 
-  //deferred.resolve();
+  deferred.resolve( loadedPlayers );
+
+  return deferred;
 }
 
 var score = function ( options, cb ) {
@@ -97,12 +108,19 @@ var loserElo = this.getElo( loser);
   */
 }
 
-var reportResults = function() {
+var reportResults = function( conch ) {
   console.log( '[reportResults] trying to talk' );
+  console.log( conch ); 
 
-  bot.reply( 'calculating elo for ' + winner + ' beats ' + loser );
+  var winner = conch.players[0];
+  var loser = conch.players[1];
 
-
+  try { 
+  bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
+  } catch ( E ) {
+    console.log( E );
+  }
+  console.log( 'a') ;
 
   // bot.startConversation( message, function( err, conversation) {
   //   var deferred = Q.defer();
@@ -129,25 +147,35 @@ var outputPromise = function( parameter ) {
   console.log( promise );
 }
 
-controller.hears( ['beat'],'direct_mention', function( _bot, message ) {
-  var parsed = message.text.split(' '),
+controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
+  var parsed = _message.text.split(' '),
     winner = parsed[0],
     loser = parsed[2],
     game = parsed[4];
 
   bot = _bot;
+  message = _message;
 
-  console.log( bot );
   var scoreOptions = {
     winner:winner.substr( 2, winner.length - 3),
     loser:loser.substr( 2, loser.length - 3)
   };
 
-  getPlayers( [winner, loser] )
+  var conch = {
+    players:  [winner, loser],
+    bot:  bot,
+    message: message
+  };
+
+/*  getPlayers( conch ) 
     // .then( calculateElo )
     // .then( getActualRatings )
    .then( reportResults )
     // .then( storePlayers );)
+    .then( outputPromise );
+*/
+  getPlayers( conch ) 
+    .then( reportResults )
     .then( outputPromise );
 });
 
