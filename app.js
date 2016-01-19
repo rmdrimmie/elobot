@@ -3,6 +3,8 @@ var Botkit = require('Botkit');
 var elo = require('elo-rank')();
 var Q = require('q');
 
+var bot;
+
 if (!process.env.token) {
   console.error( 'Error: Specify token in environment' );
   process.exit(1);
@@ -96,24 +98,30 @@ var loserElo = this.getElo( loser);
 }
 
 var reportResults = function() {
-  bot.startConversation( message, function( err, conversation) {
-    var deferred = Q.defer();
+  console.log( '[reportResults] trying to talk' );
 
-    //bot.say( 'calculating elo for ' + winner + ' beats ' + loser );
+  bot.reply( 'calculating elo for ' + winner + ' beats ' + loser );
 
 
-    deferred.resolve();
-    // results = score( scoreOptions, function( results ) {
-    //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
-    // });
-  });
+
+  // bot.startConversation( message, function( err, conversation) {
+  //   var deferred = Q.defer();
+  //
+  //   //
+  //
+  //
+  //   deferred.resolve();
+  //   // results = score( scoreOptions, function( results ) {
+  //   //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
+  //   // });
+  // });
 
 
 }
 
 var outputPromise = function( parameter ) {
-  console.log( '[outputPromise] this is:' );
-  console.log( this );
+//  console.log( '[outputPromise] this is:' );
+//  console.log( this );
 
   console.log( '[outputPromise] typeof this:' + typeof( this ));
 
@@ -121,13 +129,15 @@ var outputPromise = function( parameter ) {
   console.log( promise );
 }
 
-controller.hears( ['beat'],'direct_mention', function( bot, message ) {
+controller.hears( ['beat'],'direct_mention', function( _bot, message ) {
   var parsed = message.text.split(' '),
     winner = parsed[0],
     loser = parsed[2],
-    game = parsed[4],
-    bot = bot;
+    game = parsed[4];
 
+  bot = _bot;
+
+  console.log( bot );
   var scoreOptions = {
     winner:winner.substr( 2, winner.length - 3),
     loser:loser.substr( 2, loser.length - 3)
@@ -136,7 +146,7 @@ controller.hears( ['beat'],'direct_mention', function( bot, message ) {
   getPlayers( [winner, loser] )
     // .then( calculateElo )
     // .then( getActualRatings )
-    // .then( reportResults )
+   .then( reportResults )
     // .then( storePlayers );)
     .then( outputPromise );
 });
