@@ -52,7 +52,7 @@ var getElo = function( slackId ) {
     deferred.resolve( elo );
   } );
 
-  return deferred;
+  return deferred.promise;
 }
 
 var getPlayers = function( conch ) {
@@ -72,7 +72,7 @@ var getPlayers = function( conch ) {
 
   deferred.resolve( loadedPlayers );
 
-  return deferred;
+  return deferred.promise;
 }
 
 var score = function ( options, cb ) {
@@ -177,6 +177,9 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
   getPlayers( conch ) 
     .then( reportResults )
     .then( outputPromise );
+//
+
+  console.log( getPlayers( conch ) );
 });
 
 /*
