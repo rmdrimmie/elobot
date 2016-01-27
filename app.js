@@ -1,5 +1,13 @@
 "use strict";
 
+// test with:
+// @navi @rob beat @howdy
+//
+// tests:
+//  - players don't exist
+//  - ladders
+//  - ?
+
 var _ = require('lodash');
 var Botkit = require('Botkit');
 var elo = require('elo-rank')();
@@ -36,21 +44,24 @@ var setElo = function( slackId, elo ) {
   });
 }
 
-var getElo = function( slackId ) {
+var getElo = function( slackId, role ) {
   console.log( '[getElo] START for id ' + slackId );
   var deferred = Q.defer();
+  var role = role;
 
   var slackUser = controller.storage.users.get( slackId, function( err, elo ) {
-
     if( err && !elo ) {
       console.log( '[getElo] elo not found. creating new user ' );
       deferred.resolve( setElo( slackId, 1000 ) );
     }
 
+    elo["role"] = role;
+
     console.log( '[getElo] found elo. resolving promise with following object:' );
     console.log( elo );
+
     deferred.resolve( elo );
-  } );
+  }.bind( this ) );
 
   return deferred.promise;
 }
@@ -58,63 +69,77 @@ var getElo = function( slackId ) {
 var getPlayers = function( conch ) {
   var deferred = Q.defer();
   var players = conch.players;
-  
+
   console.log( '[getPlayers] start. getting ' + players.length + ' players.' );
 
-  var loadedPlayers =  Q.all([ 
-    getElo( conch.players[0] ),
-    getElo( conch.players[1] )
-  ]).then( 
+  var loadedPlayers =  Q.all([
+    getElo( conch.players.winner, 'winner' ),
+    getElo( conch.players.loser, 'loser' )
+  ]).then(
     function( loadedPlayers ) {
-      deferred.resolve( loadedPlayers );
+      console.log( '=====' );
+      console.log( loadedPlayers );
+      console.log( '=====' );
+      var playerIndex = 0;
+
+      for( playerIndex = 0; playerIndex < loadedPlayers.length; playerIndex++ ) {
+        if( loadedPlayers[playerIndex].role === 'winner' ) {
+          conch.winner = loadedPlayers[playerIndex];
+        }
+
+        if( loadedPlayers[playerIndex].role === 'winner' ) {
+          conch.loser = loadedPlayers[playerIndex];
+        }
+      }
+
+      console.log( '[getPlayers] resolving' );
+
+      deferred.resolve( conch );
     }
   );
 
   return deferred.promise;
 }
 
-var score = function ( options, cb ) {
-  var winner = options.winner;
-  var loser = options.loser;
-
-
-/*
-var winnerElo = this.getElo( winner );
-var loserElo = this.getElo( loser);
-
-  expectedWinner = elo.getExpected( winnerElo, loserElo );
-  expectedLoser = elo.getExpected( loserElo, winnerElo );
-
-  winnerElo = elo.updateRating( expectedWinner, 1, winnerElo );
-  loserElo = elo.updateRating( expectedLoser, 0, loserElo );
-
-  this.setElo( winner, winnerElo );
-  this.setElo( loser, loserElo );
-
-  results = {
-    winner: {
-      user: winner,
-      elo: winnerElo
-    },
-    loser: {
-      user: loser,
-      elo: loserElo
-    }
-  }
-
-  cb( results );
-  */
-}
-
 var calculateElo = function( conch ) {
-  return Q(conch);
+  console.log( '[calculateElo] starting' );
+
+  var results = {};
+  var deferred = Q.defer();
+
+  var expectedWinner = elo.getExpected( conch.winner.elo, conch.loser.elo );
+  var expectedLoser = elo.getExpected( conch.loser.elo, conch.winner.elo );
+
+  console.log( '[calculateElo] expectedWinner: ' + expectedWinner );
+  console.log( '[calculateElo] expectedLoser: ' + expectedLoser );
+
+  var winnerElo = elo.updateRating( expectedWinner, 1, conch.winner.elo );
+  var loserElo = elo.updateRating( expectedLoser, 0, conch.loser.elo );
+
+  console.log( '[calculateElo] winnerElo: ' + winnerElo );
+  console.log( '[calculateElo] loserElo: ' + loserElo );
+
+  Q.all( [
+    setElo( conch.winner.id, winnerElo ),
+    setElo( conch.loser.id, loserElo )
+  ]).then( function( newElos ) {
+    console.log( newElos );
+
+    console.log( '[calculateElo] resolving promise WITH NEW ELOs: ' );
+    console.log( newElos );
+    deferred.resolve( newElos );
+  });
+
+  console.log( '[calculateElo] resolving promise' );
+  deferred.resolve( conch );
+
+  return deferred.promise;
 }
 
 var reportResults = function( conch ) {
   var deferred = Q.defer();
 
   console.log( '[reportResults] trying to talk' );
-  console.log( conch ); 
 
   var winner = conch[0].id;
   var loser = conch[1].id;
@@ -140,8 +165,7 @@ var reportResults = function( conch ) {
 }
 
 var outputPromise = function( conch ) {
-  console.log( '[outputPromise] received following as parameter' );
-  console.log( conch );
+  console.log( '[outputPromise] received conch.' );
 }
 
 controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
@@ -159,31 +183,20 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
   };
 
   var conch = {
-    players:  [winner, loser],
+    players:  {
+      "winner": winner,
+      "loser": loser
+    },
     bot:  bot,
     message: message
   };
 
-/*  getPlayers( conch ) 
-    // .then( calculateElo )
-    // .then( getActualRatings )
-   .then( reportResults )
-    // .then( storePlayers );)
-    .then( outputPromise );
-*/
-  getPlayers( conch ) 
+  getPlayers( conch )
     .then( calculateElo )
     .then( reportResults )
-    .then( outputPromise );
-//
-
-///  console.log( getPlayers( conch ) );
+    .then( outputPromise )
+    .fail( function( error ) {
+      console.log( 'Failure in chain: ' );
+      console.log( error );
+    });
 });
-
-/*
- * find winner in db (or add with default score)
- * find loser in db (or add with default score)
- * update elo in both
- *
- *
- * */
