@@ -47,7 +47,7 @@ var getElo = function( slackId ) {
       deferred.resolve( setElo( slackId, 1000 ) );
     }
 
-    console.log( '[getElo] found elo. resolving promise with ' + elo );
+    console.log( '[getElo] found elo. resolving promise with following object:' );
     console.log( elo );
     deferred.resolve( elo );
   } );
@@ -69,8 +69,6 @@ var getPlayers = function( conch ) {
       deferred.resolve( loadedPlayers );
     }
   );
-
-//  deferred.resolve( loadedPlayers );
 
   return deferred.promise;
 }
@@ -108,21 +106,24 @@ var loserElo = this.getElo( loser);
   */
 }
 
+var calculateElo = function( conch ) {
+  return Q(conch);
+}
+
 var reportResults = function( conch ) {
+  var deferred = Q.defer();
+
   console.log( '[reportResults] trying to talk' );
   console.log( conch ); 
 
   var winner = conch[0].id;
   var loser = conch[1].id;
 
-  try { 
-    bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
-  } catch ( E ) {
-    console.log( 'error' );
-    console.log( E );
-  }
-  console.log( 'a') ;
+  bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
 
+  deferred.resolve( conch );
+
+  return deferred.promise;
   // bot.startConversation( message, function( err, conversation) {
   //   var deferred = Q.defer();
   //
@@ -138,14 +139,9 @@ var reportResults = function( conch ) {
 
 }
 
-var outputPromise = function( parameter ) {
-//  console.log( '[outputPromise] this is:' );
-//  console.log( this );
-
-  console.log( '[outputPromise] typeof this:' + typeof( this ));
-
+var outputPromise = function( conch ) {
   console.log( '[outputPromise] received following as parameter' );
-  console.log( promise );
+  console.log( conch );
 }
 
 controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
@@ -176,8 +172,9 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
     .then( outputPromise );
 */
   getPlayers( conch ) 
+    .then( calculateElo )
     .then( reportResults )
-//    .then( outputPromise );
+    .then( outputPromise );
 //
 
 ///  console.log( getPlayers( conch ) );
