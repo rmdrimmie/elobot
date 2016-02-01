@@ -42,6 +42,8 @@ var setElo = function( slackId, elo ) {
     console.log( '[setElo] user saved. resolving with promise to get elo' );
     deferred.resolve( getElo( slackId ) );
   });
+
+  return deferred.promise;
 }
 
 var getElo = function( slackId, role ) {
@@ -53,14 +55,14 @@ var getElo = function( slackId, role ) {
     if( err && !elo ) {
       console.log( '[getElo] elo not found. creating new user ' );
       deferred.resolve( setElo( slackId, 1000 ) );
+    } else {
+      elo["role"] = role;
+
+      console.log( '[getElo] found elo. resolving promise with following object:' );
+      console.log( elo );
+
+      deferred.resolve( elo );
     }
-
-    elo["role"] = role;
-
-    console.log( '[getElo] found elo. resolving promise with following object:' );
-    console.log( elo );
-
-    deferred.resolve( elo );
   }.bind( this ) );
 
   return deferred.promise;
@@ -70,16 +72,13 @@ var getPlayers = function( conch ) {
   var deferred = Q.defer();
   var players = conch.players;
 
-  console.log( '[getPlayers] start. getting ' + players.length + ' players.' );
+  console.log( '[getPlayers] start' );
 
   var loadedPlayers =  Q.all([
-    getElo( conch.players.winner, 'winner' ),
-    getElo( conch.players.loser, 'loser' )
+    getElo( conch.players.winner.id, 'winner' ),
+    getElo( conch.players.loser.id, 'loser' )
   ]).then(
     function( loadedPlayers ) {
-      console.log( '=====' );
-      console.log( loadedPlayers );
-      console.log( '=====' );
       var playerIndex = 0;
 
       for( playerIndex = 0; playerIndex < loadedPlayers.length; playerIndex++ ) {
@@ -103,35 +102,48 @@ var getPlayers = function( conch ) {
 
 var calculateElo = function( conch ) {
   console.log( '[calculateElo] starting' );
-
   var results = {};
-  var deferred = Q.defer();
 
-  var expectedWinner = elo.getExpected( conch.winner.elo, conch.loser.elo );
-  var expectedLoser = elo.getExpected( conch.loser.elo, conch.winner.elo );
+  var expectedWinner = elo.getExpected( conch.players.winner.elo, conch.players.loser.elo );
+  var expectedLoser = elo.getExpected( conch.players.loser.elo, conch.players.winner.elo );
 
   console.log( '[calculateElo] expectedWinner: ' + expectedWinner );
   console.log( '[calculateElo] expectedLoser: ' + expectedLoser );
 
-  var winnerElo = elo.updateRating( expectedWinner, 1, conch.winner.elo );
-  var loserElo = elo.updateRating( expectedLoser, 0, conch.loser.elo );
+  conch.players.winner.elo = elo.updateRating( expectedWinner, 1, conch.players.winner.elo );
+  conch.players.loser.elo = elo.updateRating( expectedLoser, 0, conch.players.loser.elo );
 
-  console.log( '[calculateElo] winnerElo: ' + winnerElo );
-  console.log( '[calculateElo] loserElo: ' + loserElo );
+  console.log( '[calculateElo] winnerElo: ' + conch.players.winner.elo );
+  console.log( '[calculateElo] loserElo: ' + conch.players.loser.elo );
+
+  console.log( '[calculateElo] returning updated conch' );
+
+  return conch;
+}
+
+var updatePlayers = function( conch ) {
+  var deferred = Q.defer();
+  var conch = conch;
+
+  console.log( '[updatePlayers] start' );
+
+  conch.players.winner.oldElo = conch.players.winner.elo;
+  conch.players.loser.oldElo = conch.players.loser.elo;
+
+  // conch.players.winner.role = 'winner';
+  // conch.players.loser.role = 'loser';
 
   Q.all( [
-    setElo( conch.winner.id, winnerElo ),
-    setElo( conch.loser.id, loserElo )
+    setElo( conch.players.winner.id, conch.players.winner.elo ),
+    setElo( conch.players.loser.id, conch.players.loser.elo )
   ]).then( function( newElos ) {
-    console.log( newElos );
 
-    console.log( '[calculateElo] resolving promise WITH NEW ELOs: ' );
-    console.log( newElos );
-    deferred.resolve( newElos );
+    console.log( '[updatePlayers] resolving promise - not testing for correct winner/loser yet: ' );
+
+    conch.players.winner.elo = newElos[0].elo;
+    conch.players.winner.elo = newElos[1].elo;
+    deferred.resolve( conch );
   });
-
-  console.log( '[calculateElo] resolving promise' );
-  deferred.resolve( conch );
 
   return deferred.promise;
 }
@@ -139,29 +151,18 @@ var calculateElo = function( conch ) {
 var reportResults = function( conch ) {
   var deferred = Q.defer();
 
-  console.log( '[reportResults] trying to talk' );
+  console.log( '[reportResults] Reporting results ' );
 
-  var winner = conch[0].id;
-  var loser = conch[1].id;
+  var response = 'Winner ' + conch.players.winner.id + ' elo from ' + conch.players.winner.oldElo + ' to ' + conch.players.winner.oldElo +
+    ' Loser ' + conch.players.loser.id + ' elo from ' + conch.players.loser.oldElo + ' to ' + conch.players.loser.oldElo
 
-  bot.reply( message, 'calculating elo for ' + winner + ' beats ' + loser );
+  console.log( '[reportResults] replying with mention of winners' );
+
+  bot.reply( message, response );
 
   deferred.resolve( conch );
 
   return deferred.promise;
-  // bot.startConversation( message, function( err, conversation) {
-  //   var deferred = Q.defer();
-  //
-  //   //
-  //
-  //
-  //   deferred.resolve();
-  //   // results = score( scoreOptions, function( results ) {
-  //   //   //bot.say( message, 'hi! ' + results.winner.user + ' new elo' + results.winner.elo );
-  //   // });
-  // });
-
-
 }
 
 var outputPromise = function( conch ) {
@@ -184,8 +185,14 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
 
   var conch = {
     players:  {
-      "winner": winner,
-      "loser": loser
+      "winner": {
+        id: winner,
+        elo: 1000
+      },
+      "loser": {
+        id: loser,
+        elo: 1000
+      }
     },
     bot:  bot,
     message: message
@@ -193,6 +200,7 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
 
   getPlayers( conch )
     .then( calculateElo )
+    .then( updatePlayers )
     .then( reportResults )
     .then( outputPromise )
     .fail( function( error ) {
