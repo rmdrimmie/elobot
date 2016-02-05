@@ -13,8 +13,6 @@ var Botkit = require('Botkit');
 var elo = require('elo-rank')();
 var Q = require('q');
 
-// var bot, message;
-
 if (!process.env.token) {
   console.error( 'Error: Specify token in environment' );
   process.exit(1);
@@ -177,9 +175,6 @@ controller.hears( ['beat'],'direct_mention', function( bot, message ) {
     winner = parsed[0],
     loser = parsed[2],
     game = parsed[4];
-
-  // bot = _bot;
-  // message = _message;
 
   var scoreOptions = {
     winner:winner.substr( 2, winner.length - 3),
