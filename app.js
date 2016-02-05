@@ -31,8 +31,8 @@ controller.spawn({
   }
 });
 
-var setElo = function( slackId, elo ) {
-  console.log( '[setElo] start for slackid:[' + slackId + '] elo:[' + elo + ']' );
+var setElo = function( slackId, game, elo ) {
+  console.log( '[setElo] start for slackid:[' + slackId + '] game:[' + game + ' elo:[' + elo + ']' );
 
   var deferred = Q.defer();
 
@@ -44,14 +44,14 @@ var setElo = function( slackId, elo ) {
   return deferred.promise;
 }
 
-var getElo = function( slackId ) {
-  console.log( '[getElo] START for id ' + slackId );
+var getElo = function( slackId, game ) {
+  console.log( '[getElo] START for id ' + slackId + ' playing ' + game);
   var deferred = Q.defer();
 
   var slackUser = controller.storage.users.get( slackId, function( err, elo ) {
     if( err && !elo ) {
       console.log( '[getElo] elo not found. creating new user ' );
-      deferred.resolve( setElo( slackId, 1000 ) );
+      deferred.resolve( setElo( slackId, game, 1000 ) );
     } else {
 
       console.log( '[getElo] found elo. resolving promise with following object:' );
@@ -71,8 +71,8 @@ var getPlayers = function( conch ) {
   console.log( '[getPlayers] start' );
 
   var loadedPlayers =  Q.all([
-    getElo( conch.players.winner.id, 'winner' ),
-    getElo( conch.players.loser.id, 'loser' )
+    getElo( conch.players.winner.id ),
+    getElo( conch.players.loser.id )
   ]).then(
     function( loadedPlayers ) {
       var playerIndex = 0;
@@ -194,6 +194,7 @@ controller.hears( ['beat'],'direct_mention', function( bot, message ) {
         oldElo: 1000
       }
     },
+    game: game,
     bot:  bot,
     message: message
   };
