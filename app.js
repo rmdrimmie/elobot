@@ -38,7 +38,7 @@ var setElo = function( slackId, elo ) {
 
   var deferred = Q.defer();
 
-  controller.storage.users.save( { id: slackId, elo: 1000 }, function( err ) {
+  controller.storage.users.save( { id: slackId, elo: elo }, function( err ) {
     console.log( '[setElo] user saved. resolving with promise to get elo' );
     deferred.resolve( getElo( slackId ) );
   });
@@ -46,17 +46,15 @@ var setElo = function( slackId, elo ) {
   return deferred.promise;
 }
 
-var getElo = function( slackId, role ) {
+var getElo = function( slackId ) {
   console.log( '[getElo] START for id ' + slackId );
   var deferred = Q.defer();
-  var role = role;
 
   var slackUser = controller.storage.users.get( slackId, function( err, elo ) {
     if( err && !elo ) {
       console.log( '[getElo] elo not found. creating new user ' );
       deferred.resolve( setElo( slackId, 1000 ) );
     } else {
-      elo["role"] = role;
 
       console.log( '[getElo] found elo. resolving promise with following object:' );
       console.log( elo );
@@ -82,12 +80,14 @@ var getPlayers = function( conch ) {
       var playerIndex = 0;
 
       for( playerIndex = 0; playerIndex < loadedPlayers.length; playerIndex++ ) {
-        if( loadedPlayers[playerIndex].role === 'winner' ) {
-          conch.winner = loadedPlayers[playerIndex];
+        if( loadedPlayers[playerIndex].id === conch.players.winner.id ) {
+          conch.players.winner = loadedPlayers[playerIndex];
+          conch.players.winner.oldElo = conch.players.winner.elo;
         }
 
-        if( loadedPlayers[playerIndex].role === 'winner' ) {
-          conch.loser = loadedPlayers[playerIndex];
+        if( loadedPlayers[playerIndex].id === conch.players.loser.id ) {
+          conch.players.loser = loadedPlayers[playerIndex];
+          conch.players.loser.oldElo = conch.players.loser.elo;
         }
       }
 
@@ -127,21 +127,24 @@ var updatePlayers = function( conch ) {
 
   console.log( '[updatePlayers] start' );
 
-  conch.players.winner.oldElo = conch.players.winner.elo;
-  conch.players.loser.oldElo = conch.players.loser.elo;
-
-  // conch.players.winner.role = 'winner';
-  // conch.players.loser.role = 'loser';
-
   Q.all( [
     setElo( conch.players.winner.id, conch.players.winner.elo ),
     setElo( conch.players.loser.id, conch.players.loser.elo )
   ]).then( function( newElos ) {
 
-    console.log( '[updatePlayers] resolving promise - not testing for correct winner/loser yet: ' );
+    console.log( newElos );
 
-    conch.players.winner.elo = newElos[0].elo;
-    conch.players.winner.elo = newElos[1].elo;
+    for( var newEloIndex = 0; newEloIndex < newElos.length; newEloIndex++ ) {
+      if( newElos[newEloIndex].id === conch.players.winner.id ) {
+        conch.players.winner.elo = newElos[newEloIndex].elo;
+      }
+
+      if( newElos[newEloIndex].id === conch.players.loser.id ) {
+        conch.players.loser.elo = newElos[newEloIndex].elo;
+      }
+    }
+
+    console.log( '[updatePlayers] resolving promise.' );
     deferred.resolve( conch );
   });
 
@@ -153,8 +156,8 @@ var reportResults = function( conch ) {
 
   console.log( '[reportResults] Reporting results ' );
 
-  var response = 'Winner ' + conch.players.winner.id + ' elo from ' + conch.players.winner.oldElo + ' to ' + conch.players.winner.oldElo +
-    ' Loser ' + conch.players.loser.id + ' elo from ' + conch.players.loser.oldElo + ' to ' + conch.players.loser.oldElo
+  var response = 'Winner ' + conch.players.winner.id + ' elo from ' + conch.players.winner.oldElo + ' to ' + conch.players.winner.elo +
+    ' Loser ' + conch.players.loser.id + ' elo from ' + conch.players.loser.oldElo + ' to ' + conch.players.loser.elo
 
   console.log( '[reportResults] replying with mention of winners' );
 
@@ -187,11 +190,13 @@ controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
     players:  {
       "winner": {
         id: winner,
-        elo: 1000
+        elo: 1000,
+        oldElo: 1000
       },
       "loser": {
         id: loser,
-        elo: 1000
+        elo: 1000,
+        oldElo: 1000
       }
     },
     bot:  bot,
