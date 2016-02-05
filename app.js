@@ -13,7 +13,7 @@ var Botkit = require('Botkit');
 var elo = require('elo-rank')();
 var Q = require('q');
 
-var bot, message;
+// var bot, message;
 
 if (!process.env.token) {
   console.error( 'Error: Specify token in environment' );
@@ -161,7 +161,7 @@ var reportResults = function( conch ) {
 
   console.log( '[reportResults] replying with mention of winners' );
 
-  bot.reply( message, response );
+  conch.bot.reply( conch.message, response );
 
   deferred.resolve( conch );
 
@@ -172,14 +172,14 @@ var outputPromise = function( conch ) {
   console.log( '[outputPromise] received conch.' );
 }
 
-controller.hears( ['beat'],'direct_mention', function( _bot, _message ) {
-  var parsed = _message.text.split(' '),
+controller.hears( ['beat'],'direct_mention', function( bot, message ) {
+  var parsed = message.text.split(' '),
     winner = parsed[0],
     loser = parsed[2],
     game = parsed[4];
 
-  bot = _bot;
-  message = _message;
+  // bot = _bot;
+  // message = _message;
 
   var scoreOptions = {
     winner:winner.substr( 2, winner.length - 3),
